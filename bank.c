@@ -11,6 +11,7 @@
 struct bank {
 	int num_accounts;        // number of accounts
 	int *accounts;           // balance array
+	pthread_mutex_t **mutex; // mutex array
 };
 
 struct args {
@@ -36,6 +37,8 @@ void *deposit(void *ptr)
 		amount  = rand() % MAX_AMOUNT;
 		account = rand() % args->bank->num_accounts;
 
+		pthread_mutex_lock(args->bank->mutex[account]);
+
 		printf("Thread %d depositing %d on account %d\n",
 			args->thread_num, amount, account);
 
@@ -49,6 +52,8 @@ void *deposit(void *ptr)
 		if(args->delay) usleep(args->delay);
 
 		args->net_total += amount;
+
+		pthread_mutex_unlock(args->bank->mutex[account]);
 	}
 	return NULL;
 }
@@ -117,17 +122,43 @@ void wait(struct options opt, struct bank *bank, struct thread_info *threads) {
 	for (int i = 0; i < opt.num_threads; i++)
 		free(threads[i].args);
 
+	for (int i = 0; i < opt.num_accounts; i++) {
+		pthread_mutex_destroy(bank->mutex[i]);
+		free(bank->mutex[i]);
+	}
+
+	free(bank->mutex);
 	free(threads);
 	free(bank->accounts);
 }
 
 // allocate memory, and set all accounts to 0
 void init_accounts(struct bank *bank, int num_accounts) {
+
+	pthread_mutex_t **mutex;
+
 	bank->num_accounts = num_accounts;
 	bank->accounts     = malloc(bank->num_accounts * sizeof(int));
+	mutex = malloc(sizeof(pthread_mutex_t) * (bank->num_accounts));
 
-	for(int i=0; i < bank->num_accounts; i++)
+	if (mutex == NULL) {
+		printf("Not enough memory\n");
+		exit(1);
+	}
+	
+	for(int i=0; i < bank->num_accounts; i++) {
 		bank->accounts[i] = 0;
+		mutex[i] = malloc(sizeof(pthread_mutex_t));
+
+		if (mutex[i] == NULL) {
+			printf("Not enough memory\n");
+			exit(1);
+		}
+
+		pthread_mutex_init(mutex[i], NULL);
+	}
+
+	bank->mutex = mutex;
 }
 
 int main (int argc, char **argv)
