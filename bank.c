@@ -58,14 +58,65 @@ void *deposit(void *ptr)
 	return NULL;
 }
 
+void *transfer(void *ptr)
+{
+	struct args *args =  ptr;
+	int amount, account1, account2, balance1, balance2;
+
+	while(args->iterations--) {
+		account1 = rand() % args->bank->num_accounts;
+		do
+			account2 = rand() % args->bank->num_accounts;
+		while (account1 == account2);
+
+		while(1) {
+
+			pthread_mutex_lock(args->bank->mutex[account1]);
+			if (pthread_mutex_trylock(args->bank->mutex[account2])) {
+				pthread_mutex_unlock(args->bank->mutex[account1]);
+				continue;
+			}
+
+			balance1 = args->bank->accounts[account1];
+			if(args->delay) usleep(args->delay);
+
+			balance2 = args->bank->accounts[account2];
+			if(args->delay) usleep(args->delay);
+
+			amount = (balance1 == 0) ? 0 : rand() % (balance1 + 1);
+
+			printf("Thread %d transferring %d from account %d to account %d\n",
+				args->thread_num, amount, account1, account2);
+
+			balance1 -= amount;
+			if(args->delay) usleep(args->delay);
+
+			balance2 += amount;
+			if(args->delay) usleep(args->delay);
+
+			args->bank->accounts[account1] = balance1;
+			if(args->delay) usleep(args->delay);
+
+			args->bank->accounts[account2] = balance2;
+			if(args->delay) usleep(args->delay);
+
+			pthread_mutex_unlock(args->bank->mutex[account1]);
+			pthread_mutex_unlock(args->bank->mutex[account2]);
+			break;
+		}
+	}
+	return NULL;
+}
+
 // start opt.num_threads threads running on deposit.
 struct thread_info *start_threads(struct options opt, struct bank *bank)
 {
 	int i;
 	struct thread_info *threads;
+	int total_threads = opt.num_threads * 2;
 
-	printf("creating %d threads\n", opt.num_threads);
-	threads = malloc(sizeof(struct thread_info) * opt.num_threads);
+	printf("creating %d threads\n", total_threads);
+	threads = malloc(sizeof(struct thread_info) * total_threads);
 
 	if (threads == NULL) {
 		printf("Not enough memory\n");
@@ -73,7 +124,7 @@ struct thread_info *start_threads(struct options opt, struct bank *bank)
 	}
 
 	// Create num_thread threads running swap()
-	for (i = 0; i < opt.num_threads; i++) {
+	for (i = 0; i < total_threads; i++) {
 		threads[i].args = malloc(sizeof(struct args));
 
 		threads[i].args -> thread_num = i;
@@ -82,9 +133,16 @@ struct thread_info *start_threads(struct options opt, struct bank *bank)
 		threads[i].args -> delay      = opt.delay;
 		threads[i].args -> iterations = opt.iterations;
 
-		if (0 != pthread_create(&threads[i].id, NULL, deposit, threads[i].args)) {
-			printf("Could not create thread #%d", i);
-			exit(1);
+		if (i < opt.num_threads) {
+			if (0 != pthread_create(&threads[i].id, NULL, deposit, threads[i].args)) {
+				printf("Could not create thread #%d", i);
+				exit(1);
+			}
+		} else {
+			if (0 != pthread_create(&threads[i].id, NULL, transfer, threads[i].args)) {
+				printf("Could not create thread #%d", i);
+				exit(1);
+			}
 		}
 	}
 
@@ -114,12 +172,12 @@ void print_balances(struct bank *bank, struct thread_info *thrs, int num_threads
 // wait for all threads to finish, print totals, and free memory
 void wait(struct options opt, struct bank *bank, struct thread_info *threads) {
 	// Wait for the threads to finish
-	for (int i = 0; i < opt.num_threads; i++)
+	for (int i = 0; i < opt.num_threads * 2; i++)
 		pthread_join(threads[i].id, NULL);
 
 	print_balances(bank, threads, opt.num_threads);
 
-	for (int i = 0; i < opt.num_threads; i++)
+	for (int i = 0; i < opt.num_threads * 2; i++)
 		free(threads[i].args);
 
 	for (int i = 0; i < opt.num_accounts; i++) {
