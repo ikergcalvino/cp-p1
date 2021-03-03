@@ -117,38 +117,37 @@ void *withdraw(void *ptr)
 	struct args *args =  ptr;
 	int amount, account, balance;
 
-	while(args->iterations--) {
-		amount  = rand() % MAX_AMOUNT;
-		account = rand() % args->bank->num_accounts;
+	amount  = rand() % MAX_AMOUNT;
+	account = rand() % args->bank->num_accounts;
 
-		pthread_mutex_lock(args->bank->mutex[account]);
+	pthread_mutex_lock(args->bank->mutex[account]);
 
-		while ((amount > args->bank->accounts[account]) && (args->bank->wait))
-			pthread_cond_wait(args->bank->cond[account], args->bank->mutex[account]);
+	while ((amount > args->bank->accounts[account]) && (args->bank->wait))
+		pthread_cond_wait(args->bank->cond[account], args->bank->mutex[account]);
 
-		if (amount <= args->bank->accounts[account])
-		{
-			printf("Thread %d withdrawing %d from account %d\n",
-				args->thread_num, amount, account);
+	if (amount <= args->bank->accounts[account])
+	{
+		printf("Thread %d withdrawing %d from account %d\n",
+			args->thread_num, amount, account);
 
-			balance = args->bank->accounts[account];
-			if(args->delay) usleep(args->delay);
+		balance = args->bank->accounts[account];
+		if(args->delay) usleep(args->delay);
 
-			balance -= amount;
-			if(args->delay) usleep(args->delay);
+		balance -= amount;
+		if(args->delay) usleep(args->delay);
 
-			args->bank->accounts[account] = balance;
-			if(args->delay) usleep(args->delay);
+		args->bank->accounts[account] = balance;
+		if(args->delay) usleep(args->delay);
 
-			args->net_total += amount;
-		} else {
-			printf("Thread %d could not withdraw %d from account %d\n",
-				args->thread_num, amount, account);
-		}
-
-		pthread_cond_broadcast(args->bank->cond[account]);
-		pthread_mutex_unlock(args->bank->mutex[account]);
+		args->net_total += amount;
+	} else {
+		printf("Thread %d could not withdraw %d from account %d\n",
+			args->thread_num, amount, account);
 	}
+
+	pthread_cond_broadcast(args->bank->cond[account]);
+	pthread_mutex_unlock(args->bank->mutex[account]);
+
 	return NULL;
 }
 
