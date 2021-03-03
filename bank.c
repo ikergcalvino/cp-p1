@@ -268,12 +268,7 @@ void init_accounts(struct bank *bank, int num_accounts) {
 	mutex = malloc(sizeof(pthread_mutex_t) * (bank->num_accounts));
 	cond = malloc(sizeof(pthread_cond_t) * (bank->num_accounts));
 
-	if (mutex == NULL) {
-		printf("Not enough memory\n");
-		exit(1);
-	}
-
-	if (cond == NULL) {
+	if (mutex == NULL || cond == NULL) {
 		printf("Not enough memory\n");
 		exit(1);
 	}
@@ -281,15 +276,9 @@ void init_accounts(struct bank *bank, int num_accounts) {
 	for(int i=0; i < bank->num_accounts; i++) {
 		bank->accounts[i] = 0;
 		mutex[i] = malloc(sizeof(pthread_mutex_t));
-
-		if (mutex[i] == NULL) {
-			printf("Not enough memory\n");
-			exit(1);
-		}
-
 		cond[i] = malloc(sizeof(pthread_cond_t));
 
-		if (cond[i] == NULL) {
+		if (mutex[i] == NULL || cond[i] == NULL) {
 			printf("Not enough memory\n");
 			exit(1);
 		}
